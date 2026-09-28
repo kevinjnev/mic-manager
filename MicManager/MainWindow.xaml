@@ -1,12 +1,39 @@
 ﻿<Window x:Class="MicManager.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:MicManager"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="Mic &amp; Soundboard Manager" Height="450" Width="600" Background="#1e1e24">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="1*"/>
+        </Grid.ColumnDefinitions>
 
+        <!-- Left Column: Apps -->
+        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+            <TextBlock Text="Apps Using Mic" Foreground="White" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+            <Button Content="Refresh Apps" Click="RefreshApps_Click" Padding="5" Margin="0,0,0,10" Background="#4a4e69" Foreground="White"/>
+
+            <ItemsControl x:Name="AppList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#2b2d42" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="{Binding AppName}" Foreground="White" FontWeight="Bold"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <CheckBox Content="Mute Mic" IsChecked="{Binding IsMuted, Mode=TwoWay}" Foreground="White" VerticalAlignment="Center"/>
+                                    <Slider Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}" Width="100" Margin="15,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- Right Column: Soundboard -->
+        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+            <TextBlock Text="Soundboard" Foreground="White" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+            <Button Content="Load &amp; Play Sound" Click="PlaySound_Click" Height="50" Background="#9a8c98" Foreground="White" FontSize="16"/>
+        </StackPanel>
     </Grid>
 </Window>
