@@ -1,81 +1,109 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using NAudio.Wave;
+﻿using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using System;
+using System.Collections.Generic;
 
 namespace MicManager
 {
+    public class AudioRoute
+    {
+        public string CableName { get; set; }
+        public BufferedWaveProvider MicBuffer { get; set; }
+        public MixingSampleProvider Mixer { get; set; }
+        public VolumeSampleProvider VolumeControl { get; set; }
+        public WaveOutEvent Output { get; set; }
+
+        public bool IsMuted
+        {
+            get => VolumeControl.Volume == 0f;
+            set => VolumeControl.Volume = value ? 0f : 1f;
+        }
+    }
+
     public class AudioEngine
     {
         private WaveInEvent _micIn;
-        private WaveOutEvent _virtualCableOut;
-        private BufferedWaveProvider _micBuffer;
-        private MixingSampleProvider _mixer;
+        public List<AudioRoute> Routes { get; private set; } = new List<AudioRoute>();
 
-        public void StartRouting(int micDeviceIndex, int virtualCableOutputIndex)
+        public void StartRouting(int micDeviceIndex, Dictionary<string, int> virtualCables)
         {
-            // 1. Setup Microphone Input
             _micIn = new WaveInEvent();
             _micIn.DeviceNumber = micDeviceIndex;
-            _micIn.WaveFormat = new WaveFormat(44100, 2); // Standard format
+            _micIn.WaveFormat = new WaveFormat(44100, 16, 2); // Force 16-bit PCM
 
-            _micBuffer = new BufferedWaveProvider(_micIn.WaveFormat);
-            _micBuffer.DiscardOnBufferOverflow = true;
+            foreach (var cable in virtualCables)
+            {
+                var micBuffer = new BufferedWaveProvider(_micIn.WaveFormat) { DiscardOnBufferOverflow = true };
+
+                var mixer = new MixingSampleProvider(WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
+                mixer.ReadFully = true;
+
+                // Safely convert the 16-bit PCM buffer to Float for the mixer
+                mixer.AddMixerInput(micBuffer.ToSampleProvider());
+
+                var volumeControl = new VolumeSampleProvider(mixer) { Volume = 1.0f };
+
+                var output = new WaveOutEvent { DeviceNumber = cable.Value };
+
+                // Safely convert the Float mixer back down to 16-bit PCM for the Virtual Cable
+                output.Init(new SampleToWaveProvider16(volumeControl));
+                output.Play();
+
+                Routes.Add(new AudioRoute
+                {
+                    CableName = cable.Key,
+                    MicBuffer = micBuffer,
+                    Mixer = mixer,
+                    VolumeControl = volumeControl,
+                    Output = output
+                });
+            }
 
             _micIn.DataAvailable += (s, a) =>
             {
-                _micBuffer.AddSamples(a.Buffer, 0, a.BytesRecorded);
+                foreach (var route in Routes)
+                {
+                    route.MicBuffer.AddSamples(a.Buffer, 0, a.BytesRecorded);
+                }
             };
 
-            // 2. Setup the Mixer (Combines Mic + Soundboard)
-            _mixer = new MixingSampleProvider(WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
-            _mixer.ReadFully = true;
-
-            // Convert Mic byte buffer to ISampleProvider and add to mixer
-            var micSampleProvider = new WaveToSampleProvider(_micBuffer);
-            _mixer.AddMixerInput(micSampleProvider);
-
-            // 3. Setup Output to Virtual Cable
-            _virtualCableOut = new WaveOutEvent();
-            _virtualCableOut.DeviceNumber = virtualCableOutputIndex;
-            _virtualCableOut.Init(_mixer);
-
             _micIn.StartRecording();
-            _virtualCableOut.Play();
         }
 
         public void PlaySoundboardFile(string filePath)
         {
-            if (_mixer == null) return;
-
-            try
+            foreach (var route in Routes)
             {
-                var audioFile = new AudioFileReader(filePath);
+                try
+                {
+                    var audioFile = new AudioFileReader(filePath);
+                    var resampler = new WdlResamplingSampleProvider(audioFile, route.Mixer.WaveFormat.SampleRate);
 
-                // Ensure the soundboard file matches the mixer sample rate
-                var resampler = new WdlResamplingSampleProvider(audioFile, _mixer.WaveFormat.SampleRate);
-                var channelConverter = new MultiplexingSampleProvider(new ISampleProvider[] { resampler }, 2);
+                    // Ensure the audio file is forced to stereo to match the mixer
+                    ISampleProvider channelProvider = resampler;
+                    if (resampler.WaveFormat.Channels == 1)
+                    {
+                        channelProvider = new MonoToStereoSampleProvider(resampler);
+                    }
 
-                _mixer.AddMixerInput(channelConverter);
-            }
-            catch (Exception ex)
-            {
-                // Handle file read errors
-                Console.WriteLine($"Error playing file: {ex.Message}");
+                    route.Mixer.AddMixerInput(channelProvider);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error playing file on {route.CableName}: {ex.Message}");
+                }
             }
         }
 
         public void Stop()
         {
             _micIn?.StopRecording();
-            _virtualCableOut?.Stop();
             _micIn?.Dispose();
-            _virtualCableOut?.Dispose();
+            foreach (var route in Routes)
+            {
+                route.Output?.Stop();
+                route.Output?.Dispose();
+            }
         }
     }
 }

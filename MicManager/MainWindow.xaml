@@ -8,10 +8,9 @@
             <ColumnDefinition Width="1*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Left Column: Apps -->
+        <!-- Left Column: Apps/Cables -->
         <StackPanel Grid.Column="0" Margin="0,0,10,0">
-            <TextBlock Text="Apps Using Mic" Foreground="White" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
-            <Button Content="Refresh Apps" Click="RefreshApps_Click" Padding="5" Margin="0,0,0,10" Background="#4a4e69" Foreground="White"/>
+            <TextBlock Text="Virtual Cable Outputs" Foreground="White" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
 
             <ItemsControl x:Name="AppList">
                 <ItemsControl.ItemTemplate>
@@ -20,7 +19,7 @@
                             <StackPanel>
                                 <TextBlock Text="{Binding AppName}" Foreground="White" FontWeight="Bold"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                    <CheckBox Content="Mute Mic" IsChecked="{Binding IsMuted, Mode=TwoWay}" Foreground="White" VerticalAlignment="Center"/>
+                                    <CheckBox Content="Mute All" IsChecked="{Binding IsMuted, Mode=TwoWay}" Foreground="White" VerticalAlignment="Center"/>
                                     <Slider Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}" Width="100" Margin="15,0,0,0"/>
                                 </StackPanel>
                             </StackPanel>
